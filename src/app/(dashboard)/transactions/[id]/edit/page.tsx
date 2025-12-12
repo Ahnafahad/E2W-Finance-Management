@@ -92,6 +92,9 @@ export default function EditTransactionPage() {
   // Format dates for the form
   const formattedTransaction = {
     ...transaction,
+    type: transaction.type as "EXPENSE" | "INCOME",
+    currency: transaction.currency as "BDT" | "USD" | "GBP" | "EUR",
+    paymentStatus: transaction.paymentStatus as "UNPAID" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED",
     date: transaction.date instanceof Date
       ? transaction.date.toISOString().split('T')[0]
       : new Date(transaction.date).toISOString().split('T')[0],

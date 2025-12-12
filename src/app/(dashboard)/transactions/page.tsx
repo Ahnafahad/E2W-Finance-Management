@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { TransactionList } from '@/components/transactions/TransactionList';
@@ -31,7 +31,7 @@ interface PaginationData {
   hasPrev: boolean;
 }
 
-export default function TransactionsPage() {
+function TransactionsContent() {
   const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [pagination, setPagination] = useState<PaginationData | null>(null);
@@ -157,5 +157,20 @@ export default function TransactionsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading transactions...</p>
+        </div>
+      </div>
+    }>
+      <TransactionsContent />
+    </Suspense>
   );
 }
