@@ -1,0 +1,172 @@
+// This is your Prisma schema file
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Transaction {
+  id                  String             @id @default(cuid())
+  type                TransactionType    // EXPENSE or INCOME
+  date                DateTime
+  dueDate             DateTime?          // For payment terms
+  category            String
+  subcategory         String?
+  payee               String             // Vendor (expense) or Client (income)
+  description         String?
+  amount              Float
+  currency            Currency           @default(BDT)
+  exchangeRate        Float?             // USD to BDT
+  amountBDT           Float              // Normalized to BDT
+  paymentStatus       PaymentStatus      @default(UNPAID)
+  paymentDate         DateTime?
+  paymentMethod       String?
+  invoiceNumber       String?            @unique
+  invoiceGenerated    Boolean            @default(false)
+  invoiceUrl          String?
+  notes               String?
+  tags                String?            // Comma-separated tags
+
+  // Recurring transaction link
+  recurringTemplateId String?
+  recurringTemplate   RecurringTemplate? @relation(fields: [recurringTemplateId], references: [id])
+
+  // Metadata
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  createdBy           String?
+
+  @@index([date])
+  @@index([type])
+  @@index([paymentStatus])
+  @@index([category])
+}
+
+model RecurringTemplate {
+  id              String            @id @default(cuid())
+  type            TransactionType
+  name            String            // "Ahnaf Ahad Salary", "Framer Subscription"
+  category        String
+  subcategory     String?
+  payee           String
+  description     String?
+  amount          Float
+  currency        Currency          @default(BDT)
+
+  // Recurrence settings
+  frequency       Frequency         // MONTHLY, QUARTERLY, YEARLY
+  startDate       DateTime
+  endDate         DateTime?
+  dayOfMonth      Int?              // 1-31, for monthly recurrence
+  monthOfYear     Int?              // 1-12, for yearly recurrence
+
+  // Payment terms
+  paymentTerms    String?           // "Paid 10th of Following Month"
+  offsetDays      Int?              // Days after period end for payment
+
+  // Status
+  active          Boolean           @default(true)
+  lastGenerated   DateTime?
+  nextScheduled   DateTime?
+
+  // Generated transactions
+  transactions    Transaction[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([active])
+  @@index([nextScheduled])
+}
+
+model Category {
+  id              String     @id @default(cuid())
+  name            String     @unique
+  type            String     // "EXPENSE" or "INCOME" or "BOTH"
+  description     String?
+  color           String?    // Hex color for UI
+  icon            String?    // Icon name
+  parentId        String?    // For subcategories
+  parent          Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children        Category[] @relation("CategoryToCategory")
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model ExchangeRate {
+  id              String     @id @default(cuid())
+  fromCurrency    Currency
+  toCurrency      Currency
+  rate            Float
+  date            DateTime
+  source          String?    // "manual", "api", "bank"
+
+  createdAt       DateTime   @default(now())
+
+  @@unique([fromCurrency, toCurrency, date])
+  @@index([date])
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  type            InvoiceType   // PAYABLE (to vendor) or RECEIVABLE (from client)
+  transactionIds  String        // Comma-separated transaction IDs
+  generatedAt     DateTime      @default(now())
+  pdfUrl          String
+  sentAt          DateTime?
+
+  // Cached data for historical records
+  totalAmount     Float
+  currency        Currency
+  payee           String
+
+  createdAt       DateTime      @default(now())
+}
+
+enum TransactionType {
+  EXPENSE
+  INCOME
+}
+
+enum Currency {
+  BDT
+  USD
+  GBP
+  EUR
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum Frequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+enum InvoiceType {
+  PAYABLE    // Invoice TO vendor (for expenses)
+  RECEIVABLE // Invoice FROM client (for income)
+}

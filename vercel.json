@@ -1,0 +1,20 @@
+{
+  "cron": [
+    {
+      "path": "/api/recurring/generate",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "DATABASE_URL": "@database_url",
+    "NEXTAUTH_URL": "@nextauth_url",
+    "NEXTAUTH_SECRET": "@nextauth_secret",
+    "ADMIN_EMAIL": "@admin_email",
+    "ADMIN_PASSWORD_HASH": "@admin_password_hash"
+  }
+}
