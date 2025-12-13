@@ -121,9 +121,16 @@ async function seedTransactions() {
   }
 
   const data = fs.readFileSync(jsonPath, 'utf-8');
-  const transactions: LegacyTransaction[] = JSON.parse(data);
+  const allTransactions: LegacyTransaction[] = JSON.parse(data);
 
-  console.log(`📦 Importing ${transactions.length} transactions...`);
+  // Filter out summary/total rows
+  const summaryKeywords = ['subtotal', 'total', 'sum', 'grand'];
+  const transactions = allTransactions.filter(tx => {
+    const payeeLower = tx.payee.toLowerCase();
+    return !summaryKeywords.some(keyword => payeeLower.includes(keyword));
+  });
+
+  console.log(`📦 Found ${allTransactions.length} entries, importing ${transactions.length} actual transactions (filtered ${allTransactions.length - transactions.length} summary rows)...`);
 
   let imported = 0;
   for (const tx of transactions) {
