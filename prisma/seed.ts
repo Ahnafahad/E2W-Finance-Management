@@ -44,18 +44,12 @@ function determineTransactionDate(month: string): Date {
 }
 
 function getCurrency(amount: number, payee: string): Currency {
-  // Check if it's a USD subscription
-  const usdKeywords = ['domain', 'google', 'framer', 'workspace'];
-  if (usdKeywords.some(keyword => payee.toLowerCase().includes(keyword))) {
-    return Currency.USD;
-  }
+  // All legacy transactions are in BDT (already converted)
   return Currency.BDT;
 }
 
 function getExchangeRate(currency: Currency): number | null {
-  if (currency === Currency.USD) {
-    return 110; // Approximate USD to BDT rate for 2024
-  }
+  // No exchange rate needed - all amounts already in BDT
   return null;
 }
 
