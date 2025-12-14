@@ -24,7 +24,7 @@ function parseCategory(category: string): { main: string; subcategory?: string }
 }
 
 function calculateDueDate(month: string, paymentTerms: string): Date {
-  const year = 2024;
+  const year = 2025;
   const monthIndex = monthMap[month];
 
   if (paymentTerms.includes('10th of Following Month')) {
@@ -37,7 +37,7 @@ function calculateDueDate(month: string, paymentTerms: string): Date {
 }
 
 function determineTransactionDate(month: string): Date {
-  const year = 2024;
+  const year = 2025;
   const monthIndex = monthMap[month];
   // First day of the month
   return new Date(year, monthIndex, 1);
@@ -153,7 +153,7 @@ async function seedTransactions() {
           amountBDT,
           paymentStatus: isPaid ? PaymentStatus.PAID : PaymentStatus.UNPAID,
           paymentDate: isPaid ? dueDate : null,
-          notes: `Imported from legacy system - ${tx.month} 2024`,
+          notes: `Imported from legacy system - ${tx.month} 2025`,
         },
       });
       imported++;
@@ -167,11 +167,11 @@ async function seedTransactions() {
 
 async function seedExchangeRates() {
   const rates = [
-    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 110, date: new Date('2024-01-01') },
-    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 110.5, date: new Date('2024-06-01') },
-    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 111, date: new Date('2024-12-01') },
-    { fromCurrency: Currency.GBP, toCurrency: Currency.BDT, rate: 140, date: new Date('2024-01-01') },
-    { fromCurrency: Currency.EUR, toCurrency: Currency.BDT, rate: 120, date: new Date('2024-01-01') },
+    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 110, date: new Date('2025-01-01') },
+    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 110.5, date: new Date('2025-06-01') },
+    { fromCurrency: Currency.USD, toCurrency: Currency.BDT, rate: 111, date: new Date('2025-12-01') },
+    { fromCurrency: Currency.GBP, toCurrency: Currency.BDT, rate: 140, date: new Date('2025-01-01') },
+    { fromCurrency: Currency.EUR, toCurrency: Currency.BDT, rate: 120, date: new Date('2025-01-01') },
   ];
 
   for (const rate of rates) {
