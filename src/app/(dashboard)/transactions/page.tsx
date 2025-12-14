@@ -127,7 +127,11 @@ function TransactionsContent() {
       {!loading && !error && (
         <>
           <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-            <TransactionList transactions={transactions} onDelete={handleDelete} />
+            <TransactionList
+              transactions={transactions}
+              onDelete={handleDelete}
+              onUpdate={fetchTransactions}
+            />
           </div>
 
           {/* Pagination */}
