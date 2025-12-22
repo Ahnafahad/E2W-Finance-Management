@@ -5,6 +5,7 @@ import * as path from 'path';
 // Adaptive JSON format interfaces
 interface InvoiceMetadata {
   client?: string;
+  chargedTo?: string; // Individual person being charged
   project?: string;
   duration?: string;
   invoiceNumber?: string;
@@ -155,6 +156,7 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
 
   // Invoice metadata
   const client = data.metadata?.client || data.transaction?.payee || 'Client';
+  const chargedTo = data.metadata?.chargedTo || '';
   const project = data.metadata?.project || '';
   const duration = data.metadata?.duration || '';
   const invoiceNumber = data.metadata?.invoiceNumber || data.transaction?.invoiceNumber || 'INV-001';
@@ -239,8 +241,19 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
     color: textPrimary,
   });
 
+  if (chargedTo) {
+    leftY -= 18;
+    page.drawText(`Charged to: ${chargedTo}`, {
+      x: 50,
+      y: leftY,
+      size: 10,
+      font: regularFont,
+      color: textSecondary,
+    });
+  }
+
   if (project) {
-    leftY -= 20;
+    leftY -= 18;
     page.drawText(`Project: ${project}`, {
       x: 50,
       y: leftY,

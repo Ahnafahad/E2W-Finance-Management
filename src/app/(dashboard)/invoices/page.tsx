@@ -20,6 +20,7 @@ interface LineItem {
 const SAMPLE_JSON = {
   metadata: {
     client: 'ExplorePro',
+    chargedTo: 'Herman Tse',
     project: "Founder's Essentials Package",
     duration: '22 Oct – 23 Dec 2025',
     invoiceNumber: 'INV-DEC-2025',
@@ -57,6 +58,7 @@ const SAMPLE_JSON = {
 export default function InvoicesPage() {
   // Manual Entry State
   const [client, setClient] = useState('');
+  const [chargedTo, setChargedTo] = useState('');
   const [project, setProject] = useState('');
   const [duration, setDuration] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -123,6 +125,7 @@ export default function InvoicesPage() {
       const invoiceData = {
         metadata: {
           client,
+          chargedTo: chargedTo || undefined,
           project: project || undefined,
           duration: duration || undefined,
           invoiceNumber: invoiceNumber || undefined,
@@ -256,6 +259,16 @@ export default function InvoicesPage() {
                     value={client}
                     onChange={(e) => setClient(e.target.value)}
                     placeholder="e.g., ExplorePro"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="chargedTo">Charged To (Person)</Label>
+                  <Input
+                    id="chargedTo"
+                    value={chargedTo}
+                    onChange={(e) => setChargedTo(e.target.value)}
+                    placeholder="e.g., Herman Tse"
                     className="mt-1"
                   />
                 </div>
@@ -486,7 +499,8 @@ export default function InvoicesPage() {
                 <div>
                   <h4 className="font-medium mb-2">Optional Fields:</h4>
                   <ul className="list-disc list-inside space-y-1 text-gray-700">
-                    <li><code>metadata.client</code> - Client name</li>
+                    <li><code>metadata.client</code> - Client/company name</li>
+                    <li><code>metadata.chargedTo</code> - Individual person being charged</li>
                     <li><code>metadata.project</code> - Project name</li>
                     <li><code>metadata.duration</code> - Duration string</li>
                     <li><code>metadata.invoiceNumber</code> - Invoice number</li>
