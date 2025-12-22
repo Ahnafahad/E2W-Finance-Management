@@ -174,7 +174,7 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
 
   // Try to load logo
   try {
-    const logoPath = path.join(process.cwd(), 'public', 'images', 'E2W-Black-Logo.png');
+    const logoPath = path.join(process.cwd(), 'public', 'images', 'e2w-black-logo.png');
     const logoBytes = await fs.readFile(logoPath);
     const logoImage = await pdfDoc.embedPng(logoBytes);
     const logoScale = 0.15; // Smaller, more subtle
@@ -188,6 +188,7 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
     });
   } catch (error) {
     // If no logo, draw company name
+    console.error('Logo not found, using text fallback:', error);
     page.drawText('E2W', {
       x: 50,
       y: currentY,

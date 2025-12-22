@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Upload, FileCode, Plus, Trash2 } from 'lucide-react';
+import { FileText, Upload, FileCode, Plus, Trash2, Download, CheckCircle, XCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
 
 interface LineItem {
   title: string;
@@ -75,6 +76,29 @@ export default function InvoicesPage() {
   // Loading States
   const [generatingManual, setGeneratingManual] = useState(false);
   const [generatingJson, setGeneratingJson] = useState(false);
+
+  // Existing Invoices State
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Fetch existing invoices
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const response = await fetch('/api/invoices');
+      if (!response.ok) throw new Error('Failed to fetch invoices');
+      const data = await response.json();
+      setInvoices(data.data);
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
 
   const addLineItem = () => {
     setLineItems([...lineItems, { title: '', description: '', details: [], amount: 0 }]);
@@ -233,6 +257,29 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleDownloadInvoice = async (id: string) => {
+    setDownloadingId(id);
+    try {
+      const response = await fetch(`/api/invoices/${id}`);
+      if (!response.ok) throw new Error('Failed to generate invoice');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      alert('Failed to download invoice');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -244,7 +291,7 @@ export default function InvoicesPage() {
       </div>
 
       <Tabs defaultValue="manual" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-3xl grid-cols-3">
           <TabsTrigger value="manual" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Manual Entry
@@ -252,6 +299,10 @@ export default function InvoicesPage() {
           <TabsTrigger value="json" className="flex items-center gap-2">
             <FileCode className="h-4 w-4" />
             JSON Import
+          </TabsTrigger>
+          <TabsTrigger value="view" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            View Invoices
           </TabsTrigger>
         </TabsList>
 
@@ -533,6 +584,109 @@ export default function InvoicesPage() {
               </div>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* View Invoices Tab */}
+        <TabsContent value="view" className="mt-6">
+          <Card className="overflow-hidden">
+            {loadingInvoices ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Invoice #
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Client
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Project
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {invoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                          No invoices found. Create your first invoice using the Manual Entry or JSON Import tabs.
+                        </td>
+                      </tr>
+                    ) : (
+                      invoices.map((invoice) => (
+                        <tr key={invoice.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {format(new Date(invoice.date), 'MMM dd, yyyy')}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                            {invoice.invoiceNumber || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {invoice.payee}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {invoice.projectName || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {invoice.currency} {invoice.amount.toFixed(2)}
+                            <span className="text-xs text-gray-500 block">
+                              BDT {invoice.amountBDT.toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                invoice.paymentStatus === 'PAID'
+                                  ? 'bg-green-100 text-green-800'
+                                  : invoice.paymentStatus === 'UNPAID'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {invoice.paymentStatus === 'PAID' ? (
+                                <CheckCircle className="h-3 w-3" />
+                              ) : (
+                                <XCircle className="h-3 w-3" />
+                              )}
+                              {invoice.paymentStatus}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownloadInvoice(invoice.id)}
+                              disabled={downloadingId === invoice.id}
+                              className="flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              {downloadingId === invoice.id ? 'Downloading...' : 'Download'}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
