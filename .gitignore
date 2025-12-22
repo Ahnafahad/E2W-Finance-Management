@@ -44,3 +44,6 @@ prisma/*.db-journal
 
 # invoices (for local dev, use Vercel Blob in production)
 /public/invoices/*.pdf
+
+.vercel
+.env*.local

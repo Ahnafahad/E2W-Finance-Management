@@ -41,6 +41,11 @@ model Transaction {
   notes               String?
   tags                String?            // Comma-separated tags
 
+  // Detailed invoice fields
+  lineItemsJson       String?            // JSON array of line items with title, details, amount
+  projectName         String?            // Project name for detailed invoices
+  duration            String?            // Duration string like "22 Oct – 23 Dec 2024"
+
   // Recurring transaction link
   recurringTemplateId String?
   recurringTemplate   RecurringTemplate? @relation(fields: [recurringTemplateId], references: [id])

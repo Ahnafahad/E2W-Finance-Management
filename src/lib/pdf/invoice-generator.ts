@@ -14,6 +14,13 @@ interface Transaction {
   paymentStatus: string;
   description?: string | null;
   invoiceNumber?: string | null;
+  lineItemsJson?: string | null;
+}
+
+interface InvoiceLineItem {
+  title: string;            // e.g., "Discovery & Strategy Phase"
+  details?: string[];       // Optional bullet points like ["Initial consultation & 5 discovery meetings"]
+  amount: number;           // Subtotal for this line item
 }
 
 interface InvoiceData {
@@ -21,6 +28,9 @@ interface InvoiceData {
   isPaid: boolean;
   invoiceNumber: string;
   invoiceDate: string;
+  lineItems?: InvoiceLineItem[];  // Optional detailed breakdown
+  duration?: string;              // Optional duration like "22 Oct – 23 Dec 2024"
+  projectName?: string;           // Optional project name
 }
 
 function getInvoiceNumber(transaction: Transaction): string {
@@ -42,6 +52,16 @@ function hashString(str: string): number {
     hash = hash & hash;
   }
   return hash;
+}
+
+function getCurrencySymbol(currency: string): string {
+  const symbols: { [key: string]: string } = {
+    'BDT': 'BDT',
+    'USD': '$',
+    'GBP': '£',
+    'EUR': '€',
+  };
+  return symbols[currency] || currency;
 }
 
 function getInvoiceDate(transaction: Transaction): string {
@@ -139,6 +159,28 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: white,
   });
 
+  // Optional: Project Name and Duration for detailed invoices
+  let headerExtraLines = 0;
+  if (invoiceData.projectName) {
+    page.drawText(`Project: ${invoiceData.projectName}`, {
+      x: 288,
+      y: height - 115.2,
+      size: 9,
+      font: helveticaFont,
+      color: white,
+    });
+    headerExtraLines++;
+  }
+  if (invoiceData.duration) {
+    page.drawText(`Duration: ${invoiceData.duration}`, {
+      x: 288,
+      y: height - 115.2 - (headerExtraLines * 14.4),
+      size: 9,
+      font: helveticaFont,
+      color: white,
+    });
+  }
+
   // Address Section
   const yAddress = height - 216; // 3 inches from top
 
@@ -202,6 +244,8 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
 
   // Table
   const yTable = height - 360; // 5 inches from top
+  const currencySymbol = getCurrencySymbol(transaction.currency);
+  const currencyLabel = transaction.currency === 'BDT' ? 'AMOUNT (BDT)' : `AMOUNT (${currencySymbol})`;
 
   // Table Header (Black background)
   page.drawRectangle({
@@ -220,7 +264,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: white,
   });
 
-  page.drawText('AMOUNT (BDT)', {
+  page.drawText(currencyLabel, {
     x: width - 145,
     y: yTable + 8.64,
     size: 10,
@@ -228,47 +272,138 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: white,
   });
 
-  // Table Row
-  const yRow = yTable - 28.8;
+  let currentY = yTable - 14.4; // Start position for rows
 
-  // Description
-  const desc = transaction.category === 'OTHER EXPENSES'
-    ? `${transaction.payee} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
-    : `${transaction.category} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
+  // Check if we have detailed line items
+  if (invoiceData.lineItems && invoiceData.lineItems.length > 0) {
+    // Render detailed line items
+    for (const item of invoiceData.lineItems) {
+      currentY -= 14.4; // Space before item
 
-  page.drawText(desc, {
-    x: 72,
-    y: yRow + 8.64,
-    size: 10,
-    font: helveticaFont,
-    color: textColor,
-  });
+      // Draw line item title (bold)
+      page.drawText(item.title, {
+        x: 72,
+        y: currentY,
+        size: 10,
+        font: helveticaBold,
+        color: textColor,
+      });
 
-  // Amount
-  const amountStr = transaction.amountBDT.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+      // Draw amount (subtotal)
+      const itemAmountStr = item.amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      const itemAmountWidth = helveticaFont.widthOfTextAtSize(itemAmountStr, 10);
+      page.drawText(itemAmountStr, {
+        x: width - 72 - itemAmountWidth,
+        y: currentY,
+        size: 10,
+        font: helveticaFont,
+        color: textColor,
+      });
 
-  const amountWidth = helveticaFont.widthOfTextAtSize(amountStr, 10);
-  page.drawText(amountStr, {
-    x: width - 72 - amountWidth,
-    y: yRow + 8.64,
-    size: 10,
-    font: helveticaFont,
-    color: textColor,
-  });
+      currentY -= 11.52; // Space for details
 
-  // Bottom Line
-  page.drawLine({
-    start: { x: 57.6, y: yRow },
-    end: { x: width - 57.6, y: yRow },
-    thickness: 0.5,
-    color: lineColor,
-  });
+      // Draw detail bullets if present
+      if (item.details && item.details.length > 0) {
+        for (const detail of item.details) {
+          // Word wrap if detail is too long
+          const maxWidth = 350; // Maximum width for detail text
+          const words = detail.split(' ');
+          let line = '';
+
+          for (const word of words) {
+            const testLine = line + (line ? ' ' : '') + word;
+            const testWidth = helveticaFont.widthOfTextAtSize(testLine, 9);
+
+            if (testWidth > maxWidth && line) {
+              // Draw current line
+              page.drawText(`• ${line}`, {
+                x: 86.4, // Indented
+                y: currentY,
+                size: 9,
+                font: helveticaFont,
+                color: rgb(0.4, 0.4, 0.4),
+              });
+              currentY -= 10.8;
+              line = word;
+            } else {
+              line = testLine;
+            }
+          }
+
+          // Draw remaining line
+          if (line) {
+            page.drawText(`• ${line}`, {
+              x: 86.4,
+              y: currentY,
+              size: 9,
+              font: helveticaFont,
+              color: rgb(0.4, 0.4, 0.4),
+            });
+            currentY -= 10.8;
+          }
+        }
+      }
+
+      currentY -= 7.2; // Space after item
+    }
+
+    // Draw separator line
+    currentY -= 7.2;
+    page.drawLine({
+      start: { x: 57.6, y: currentY },
+      end: { x: width - 57.6, y: currentY },
+      thickness: 0.5,
+      color: lineColor,
+    });
+  } else {
+    // Single line item (legacy format)
+    currentY -= 14.4;
+
+    // Description
+    const desc = transaction.category === 'OTHER EXPENSES'
+      ? `${transaction.payee} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+      : `${transaction.category} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
+
+    page.drawText(desc, {
+      x: 72,
+      y: currentY,
+      size: 10,
+      font: helveticaFont,
+      color: textColor,
+    });
+
+    // Amount
+    const displayAmount = transaction.currency === 'BDT' ? transaction.amountBDT : transaction.amount;
+    const amountStr = displayAmount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+    const amountWidth = helveticaFont.widthOfTextAtSize(amountStr, 10);
+    page.drawText(amountStr, {
+      x: width - 72 - amountWidth,
+      y: currentY,
+      size: 10,
+      font: helveticaFont,
+      color: textColor,
+    });
+
+    currentY -= 14.4;
+
+    // Bottom Line
+    page.drawLine({
+      start: { x: 57.6, y: currentY },
+      end: { x: width - 57.6, y: currentY },
+      thickness: 0.5,
+      color: lineColor,
+    });
+  }
 
   // Total Section
-  const yTotal = yRow - 57.6;
+  const yTotal = currentY - 28.8;
 
   page.drawText('TOTAL', {
     x: 288,
@@ -278,7 +413,17 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
 
-  const totalStr = `BDT ${amountStr}`;
+  // Calculate total from line items or use transaction amount
+  const totalAmount = invoiceData.lineItems && invoiceData.lineItems.length > 0
+    ? invoiceData.lineItems.reduce((sum, item) => sum + item.amount, 0)
+    : (transaction.currency === 'BDT' ? transaction.amountBDT : transaction.amount);
+
+  const totalAmountStr = totalAmount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+  const totalStr = `${currencySymbol} ${totalAmountStr}`;
   const totalWidth = helveticaBold.widthOfTextAtSize(totalStr, 14);
   page.drawText(totalStr, {
     x: width - 72 - totalWidth,
@@ -352,6 +497,33 @@ export async function generateInvoiceForTransaction(
     throw new Error('Transaction not found');
   }
 
+  // Check if transaction has modern invoice data (lineItemsJson)
+  if (transaction.lineItemsJson) {
+    // Use modern invoice generator
+    const { generateModernInvoicePDF } = await import('./modern-invoice-generator');
+
+    const lineItems = JSON.parse(transaction.lineItemsJson);
+    const invoiceData = {
+      metadata: {
+        client: transaction.payee,
+        project: transaction.projectName || undefined,
+        duration: transaction.duration || undefined,
+        invoiceNumber: transaction.invoiceNumber || getInvoiceNumber(transaction),
+        notes: transaction.notes || undefined,
+      },
+      currency: transaction.currency,
+      lineItems: lineItems,
+      totals: {
+        total: transaction.currency === 'BDT' ? transaction.amountBDT : transaction.amount,
+      },
+      isPaid: transaction.paymentStatus === 'PAID',
+      invoiceDate: getInvoiceDate(transaction),
+    };
+
+    return await generateModernInvoicePDF(invoiceData);
+  }
+
+  // Use legacy invoice generator
   const invoiceData: InvoiceData = {
     transaction,
     isPaid: transaction.paymentStatus === 'PAID',
