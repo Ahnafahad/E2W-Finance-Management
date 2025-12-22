@@ -151,17 +151,21 @@ export default function InvoicesPage() {
 
       if (!response.ok) throw new Error('Failed to generate invoice');
 
+      // Extract transaction info from headers
+      const transactionId = response.headers.get('X-Transaction-Id');
+      const generatedInvoiceNumber = response.headers.get('X-Invoice-Number');
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `invoice-${invoiceNumber || client.replace(/\s/g, '-')}.pdf`;
+      a.download = `invoice-${generatedInvoiceNumber || invoiceNumber || client.replace(/\s/g, '-')}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      alert('Invoice generated successfully!');
+      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nA revenue transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
     } catch (error) {
       console.error('Error generating invoice:', error);
       alert('Failed to generate invoice. Please try again.');
@@ -198,11 +202,16 @@ export default function InvoicesPage() {
 
       if (!response.ok) throw new Error('Failed to generate invoice');
 
+      // Extract transaction info from headers
+      const transactionId = response.headers.get('X-Transaction-Id');
+      const generatedInvoiceNumber = response.headers.get('X-Invoice-Number');
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const fileName = parsedData.metadata?.invoiceNumber ||
+      const fileName = generatedInvoiceNumber ||
+                      parsedData.metadata?.invoiceNumber ||
                       parsedData.metadata?.client?.replace(/\s/g, '-') ||
                       'invoice';
       a.download = `${fileName}.pdf`;
@@ -211,7 +220,7 @@ export default function InvoicesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      alert('Invoice generated successfully!');
+      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nA revenue transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
     } catch (error: any) {
       console.error('Error generating invoice:', error);
       if (error instanceof SyntaxError) {
