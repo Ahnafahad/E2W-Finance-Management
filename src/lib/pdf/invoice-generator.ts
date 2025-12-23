@@ -183,9 +183,10 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
 
   // Address Section
   const yAddress = height - 216; // 3 inches from top
+  const isExpense = transaction.type === 'EXPENSE';
 
-  // FROM
-  page.drawText('FROM', {
+  // FROM / BILL FROM
+  page.drawText(isExpense ? 'BILL FROM' : 'FROM', {
     x: 57.6,
     y: yAddress,
     size: 10,
@@ -193,7 +194,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
 
-  page.drawText(transaction.payee, {
+  page.drawText(isExpense ? transaction.payee : 'E2W', {
     x: 57.6,
     y: yAddress - 18,
     size: 12,
@@ -201,8 +202,8 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: textColor,
   });
 
-  // BILL TO
-  page.drawText('BILL TO', {
+  // BILL TO / TO
+  page.drawText(isExpense ? 'BILL TO' : 'TO', {
     x: 288,
     y: yAddress,
     size: 10,
@@ -210,7 +211,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     color: black,
   });
 
-  page.drawText('E2W', {
+  page.drawText(isExpense ? 'E2W' : transaction.payee, {
     x: 288,
     y: yAddress - 18,
     size: 12,
@@ -504,6 +505,7 @@ export async function generateInvoiceForTransaction(
 
     const lineItems = JSON.parse(transaction.lineItemsJson);
     const invoiceData = {
+      type: transaction.type, // Pass transaction type (INCOME or EXPENSE)
       metadata: {
         client: transaction.payee,
         project: transaction.projectName || undefined,
