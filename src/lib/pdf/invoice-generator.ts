@@ -4,6 +4,7 @@ import * as path from 'path';
 
 interface Transaction {
   id: string;
+  type: string; // INCOME or EXPENSE
   payee: string;
   category: string;
   amount: number;
@@ -15,6 +16,9 @@ interface Transaction {
   description?: string | null;
   invoiceNumber?: string | null;
   lineItemsJson?: string | null;
+  projectName?: string | null;
+  duration?: string | null;
+  notes?: string | null;
 }
 
 interface InvoiceLineItem {
