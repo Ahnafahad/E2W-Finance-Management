@@ -367,8 +367,9 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
       // For recurring transactions with "10th of following month" payment terms,
       // the transaction date is payment date, so work was done in previous month
       const transactionDate = new Date(transaction.date);
-      const isRecurring = transaction.category.toLowerCase().includes('salary') ||
-                         transaction.category.toLowerCase().includes('subscription');
+      const categoryLower = (transaction.category || '').toLowerCase();
+      const isRecurring = categoryLower.includes('salary') ||
+                         categoryLower.includes('subscription');
 
       let displayDate: Date;
       if (isRecurring && transaction.dueDate) {

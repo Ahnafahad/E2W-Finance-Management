@@ -122,8 +122,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error generating invoice:', error);
+    console.error('Full error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+
     return NextResponse.json(
-      { error: 'Failed to generate invoice' },
+      {
+        error: 'Failed to generate invoice',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

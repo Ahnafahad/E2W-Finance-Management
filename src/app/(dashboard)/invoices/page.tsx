@@ -18,7 +18,7 @@ interface LineItem {
   amount: number;
 }
 
-const SAMPLE_JSON = {
+const SAMPLE_CLIENT_JSON = {
   type: 'INCOME',
   metadata: {
     client: 'ExplorePro',
@@ -57,6 +57,54 @@ const SAMPLE_JSON = {
   },
 };
 
+const SAMPLE_EXPENSE_JSON = {
+  type: 'EXPENSE',
+  metadata: {
+    client: 'AWS',
+    project: 'Cloud Infrastructure',
+    duration: 'December 2025',
+    invoiceNumber: 'AWS-INV-123456',
+    notes: 'Monthly cloud services bill.',
+  },
+  currency: 'USD',
+  lineItems: [
+    {
+      title: 'EC2 Instances',
+      description: 'Compute resources',
+      details: [
+        't3.medium instances (2x)',
+        '720 hours runtime',
+        'us-east-1 region',
+      ],
+      amount: 85.0,
+    },
+    {
+      title: 'S3 Storage',
+      description: 'Object storage',
+      details: [
+        '500 GB standard storage',
+        '1M PUT/GET requests',
+      ],
+      amount: 12.5,
+    },
+    {
+      title: 'RDS Database',
+      description: 'PostgreSQL instance',
+      details: [
+        'db.t3.small instance',
+        '100 GB SSD storage',
+      ],
+      amount: 45.0,
+    },
+  ],
+  totals: {
+    subtotal: 142.5,
+    tax: 0,
+    discount: 0,
+    total: 142.5,
+  },
+};
+
 export default function InvoicesPage() {
   // Manual Entry State
   const [type, setType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
@@ -72,8 +120,9 @@ export default function InvoicesPage() {
   ]);
 
   // JSON Entry State
-  const [jsonInput, setJsonInput] = useState(JSON.stringify(SAMPLE_JSON, null, 2));
+  const [jsonInput, setJsonInput] = useState(JSON.stringify(SAMPLE_CLIENT_JSON, null, 2));
   const [jsonError, setJsonError] = useState('');
+  const [sampleType, setSampleType] = useState<'client' | 'expense'>('client');
 
   // Loading States
   const [generatingManual, setGeneratingManual] = useState(false);
@@ -567,6 +616,33 @@ export default function InvoicesPage() {
             {/* JSON Format Guide */}
             <Card className="p-6 bg-gray-50">
               <h3 className="text-lg font-semibold mb-4">JSON Format Guide</h3>
+
+              {/* Sample Switcher */}
+              <div className="mb-4 flex gap-2">
+                <Button
+                  type="button"
+                  variant={sampleType === 'client' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setSampleType('client');
+                    setJsonInput(JSON.stringify(SAMPLE_CLIENT_JSON, null, 2));
+                  }}
+                >
+                  Client Invoice Sample
+                </Button>
+                <Button
+                  type="button"
+                  variant={sampleType === 'expense' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setSampleType('expense');
+                    setJsonInput(JSON.stringify(SAMPLE_EXPENSE_JSON, null, 2));
+                  }}
+                >
+                  Expense Invoice Sample
+                </Button>
+              </div>
+
               <div className="space-y-4 text-sm">
                 <div>
                   <h4 className="font-medium mb-2">Required Fields:</h4>
@@ -580,8 +656,9 @@ export default function InvoicesPage() {
                 <div>
                   <h4 className="font-medium mb-2">Optional Fields:</h4>
                   <ul className="list-disc list-inside space-y-1 text-gray-700">
-                    <li><code>metadata.client</code> - Client/company name</li>
-                    <li><code>metadata.chargedTo</code> - Individual person being charged</li>
+                    <li><code>type</code> - "INCOME" (client) or "EXPENSE" (vendor)</li>
+                    <li><code>metadata.client</code> - Client/vendor name</li>
+                    <li><code>metadata.chargedTo</code> - Individual person/contact</li>
                     <li><code>metadata.project</code> - Project name</li>
                     <li><code>metadata.duration</code> - Duration string</li>
                     <li><code>metadata.invoiceNumber</code> - Invoice number</li>
