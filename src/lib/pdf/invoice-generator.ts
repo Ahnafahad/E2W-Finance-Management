@@ -121,7 +121,7 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     });
   } catch (error) {
     // Logo not found, skip
-    console.warn('Logo not found, skipping:', error);
+    console.warn('Logo not found, skipping');
   }
 
   // Invoice Title

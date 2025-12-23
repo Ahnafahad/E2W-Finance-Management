@@ -190,7 +190,7 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
     });
   } catch (error) {
     // If no logo, draw company name
-    console.error('Logo not found, using text fallback:', error);
+    console.warn('Logo not found, using text fallback');
     page.drawText('E2W', {
       x: 50,
       y: currentY,
