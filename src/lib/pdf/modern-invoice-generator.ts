@@ -34,6 +34,7 @@ interface InvoiceTotals {
 }
 
 interface ModernInvoiceData {
+  type?: 'INCOME' | 'EXPENSE';
   metadata?: InvoiceMetadata;
   lineItems: LineItem[];
   totals?: InvoiceTotals;
@@ -150,12 +151,13 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
   const bgLight = rgb(0.98, 0.98, 0.99); // Off-white
 
   // Extract data
+  const invoiceType = data.type || 'INCOME';
   const currency = data.currency || data.transaction?.currency || 'GBP';
   const currencySymbol = getCurrencySymbol(currency);
   const isPaid = data.isPaid || false;
 
   // Invoice metadata
-  const client = data.metadata?.client || data.transaction?.payee || 'Client';
+  const client = data.metadata?.client || data.transaction?.payee || (invoiceType === 'INCOME' ? 'Client' : 'Vendor');
   const chargedTo = data.metadata?.chargedTo || '';
   const project = data.metadata?.project || '';
   const duration = data.metadata?.duration || '';
@@ -223,9 +225,10 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
   // INVOICE INFO SECTION - Two column layout
   // ============================================
 
-  // Left column - Bill To
+  // Left column - Bill To/From based on type
   let leftY = currentY;
-  page.drawText('BILL TO', {
+  const billLabel = invoiceType === 'INCOME' ? 'BILL TO' : 'BILL FROM';
+  page.drawText(billLabel, {
     x: 50,
     y: leftY,
     size: 9,
@@ -244,7 +247,8 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
 
   if (chargedTo) {
     leftY -= 18;
-    page.drawText(`Charged to: ${chargedTo}`, {
+    const chargedLabel = invoiceType === 'INCOME' ? 'Charged to' : 'Contact';
+    page.drawText(`${chargedLabel}: ${chargedTo}`, {
       x: 50,
       y: leftY,
       size: 10,

@@ -6,6 +6,9 @@ export async function POST(request: NextRequest) {
   try {
     const invoiceData = await request.json();
 
+    // Get transaction type (default to INCOME for backward compatibility)
+    const transactionType = invoiceData.type || 'INCOME';
+
     // Validate required fields
     if (!invoiceData.lineItems || invoiceData.lineItems.length === 0) {
       return NextResponse.json(
@@ -16,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     if (!invoiceData.metadata?.client) {
       return NextResponse.json(
-        { error: 'Client name is required' },
+        { error: `${transactionType === 'INCOME' ? 'Client' : 'Vendor'} name is required` },
         { status: 400 }
       );
     }
@@ -72,13 +75,13 @@ export async function POST(request: NextRequest) {
     // Create transaction record
     const transaction = await prisma.transaction.create({
       data: {
-        type: 'INCOME',
+        type: transactionType,
         date: new Date(),
-        category: 'CLIENT INVOICE',
+        category: transactionType === 'INCOME' ? 'CLIENT INVOICE' : 'VENDOR INVOICE',
         payee: invoiceData.metadata.client,
         description: invoiceData.metadata.chargedTo
-          ? `Invoice for ${invoiceData.metadata.client} - Charged to: ${invoiceData.metadata.chargedTo}`
-          : `Invoice for ${invoiceData.metadata.client}`,
+          ? `Invoice ${transactionType === 'INCOME' ? 'for' : 'from'} ${invoiceData.metadata.client}${invoiceData.metadata.chargedTo ? ` - ${transactionType === 'INCOME' ? 'Charged to' : 'Received by'}: ${invoiceData.metadata.chargedTo}` : ''}`
+          : `Invoice ${transactionType === 'INCOME' ? 'for' : 'from'} ${invoiceData.metadata.client}`,
         amount: calculatedTotal,
         currency: currency,
         exchangeRate: exchangeRate,

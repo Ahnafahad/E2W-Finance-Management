@@ -19,6 +19,7 @@ interface LineItem {
 }
 
 const SAMPLE_JSON = {
+  type: 'INCOME',
   metadata: {
     client: 'ExplorePro',
     chargedTo: 'Herman Tse',
@@ -58,6 +59,7 @@ const SAMPLE_JSON = {
 
 export default function InvoicesPage() {
   // Manual Entry State
+  const [type, setType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
   const [client, setClient] = useState('');
   const [chargedTo, setChargedTo] = useState('');
   const [project, setProject] = useState('');
@@ -134,7 +136,7 @@ export default function InvoicesPage() {
   const handleGenerateManual = async () => {
     // Validation
     if (!client.trim()) {
-      alert('Please enter a client name');
+      alert(`Please enter a ${type === 'INCOME' ? 'client' : 'vendor'} name`);
       return;
     }
 
@@ -147,6 +149,7 @@ export default function InvoicesPage() {
 
     try {
       const invoiceData = {
+        type,
         metadata: {
           client,
           chargedTo: chargedTo || undefined,
@@ -189,7 +192,7 @@ export default function InvoicesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nA revenue transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
+      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nAn ${type === 'INCOME' ? 'income' : 'expense'} transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
     } catch (error) {
       console.error('Error generating invoice:', error);
       alert('Failed to generate invoice. Please try again.');
@@ -244,7 +247,8 @@ export default function InvoicesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nA revenue transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
+      const invoiceType = parsedData.type === 'EXPENSE' ? 'expense' : 'income';
+      alert(`Invoice generated successfully!\n\nInvoice #: ${generatedInvoiceNumber}\n\nAn ${invoiceType} transaction has been created and saved to the system.\nYou can view it in the Transactions page.`);
     } catch (error: any) {
       console.error('Error generating invoice:', error);
       if (error instanceof SyntaxError) {
@@ -284,9 +288,9 @@ export default function InvoicesPage() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Client Invoices</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Create professional invoices with detailed breakdowns
+          Create professional invoices for both clients and vendors
         </p>
       </div>
 
@@ -310,15 +314,32 @@ export default function InvoicesPage() {
         <TabsContent value="manual" className="mt-6">
           <Card className="p-6">
             <div className="space-y-6">
+              {/* Type Selector */}
+              <div>
+                <Label htmlFor="type">Invoice Type *</Label>
+                <Select value={type} onValueChange={(value: 'INCOME' | 'EXPENSE') => setType(value)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INCOME">Client Invoice (Revenue)</SelectItem>
+                    <SelectItem value="EXPENSE">Vendor Invoice (Expense)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {type === 'INCOME' ? 'Invoice sent to client for payment' : 'Invoice received from vendor/supplier'}
+                </p>
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="client">Client Name *</Label>
+                  <Label htmlFor="client">{type === 'INCOME' ? 'Client Name' : 'Vendor/Supplier Name'} *</Label>
                   <Input
                     id="client"
                     value={client}
                     onChange={(e) => setClient(e.target.value)}
-                    placeholder="e.g., ExplorePro"
+                    placeholder={type === 'INCOME' ? 'e.g., ExplorePro' : 'e.g., AWS, Google Cloud'}
                     className="mt-1"
                   />
                 </div>
