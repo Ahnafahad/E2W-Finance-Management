@@ -69,19 +69,9 @@ function getCurrencySymbol(currency: string): string {
 }
 
 function getInvoiceDate(transaction: Transaction): string {
-  if (transaction.dueDate) {
-    const dueDate = new Date(transaction.dueDate);
-    return dueDate.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-  }
-
+  // Use transaction date as invoice date
   const date = new Date(transaction.date);
-  // Get end of month
-  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  return endOfMonth.toLocaleDateString('en-GB', {
+  return date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
@@ -367,10 +357,33 @@ export async function generateInvoicePDF(invoiceData: InvoiceData): Promise<Uint
     // Single line item (legacy format)
     currentY -= 14.4;
 
-    // Description
-    const desc = transaction.category === 'OTHER EXPENSES'
-      ? `${transaction.payee} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
-      : `${transaction.category} - ${new Date(transaction.date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
+    // Description - use transaction description if available, otherwise generate
+    let desc: string;
+    if (transaction.description) {
+      // Use existing description (which should contain the correct work period)
+      desc = transaction.description;
+    } else {
+      // Generate description from transaction data
+      // For recurring transactions with "10th of following month" payment terms,
+      // the transaction date is payment date, so work was done in previous month
+      const transactionDate = new Date(transaction.date);
+      const isRecurring = transaction.category.toLowerCase().includes('salary') ||
+                         transaction.category.toLowerCase().includes('subscription');
+
+      let displayDate: Date;
+      if (isRecurring && transaction.dueDate) {
+        // Use previous month for recurring payments
+        displayDate = new Date(transactionDate);
+        displayDate.setMonth(displayDate.getMonth() - 1);
+      } else {
+        displayDate = transactionDate;
+      }
+
+      const dateStr = displayDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      desc = transaction.category === 'OTHER EXPENSES'
+        ? `${transaction.payee} - ${dateStr}`
+        : `${transaction.category} - ${dateStr}`;
+    }
 
     page.drawText(desc, {
       x: 72,
