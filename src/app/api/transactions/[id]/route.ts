@@ -70,6 +70,17 @@ export async function PATCH(
     // Calculate amountBDT if needed
     const updateData: any = { ...validatedData };
 
+    // Convert date strings to Date objects for Prisma
+    if (validatedData.date && typeof validatedData.date === 'string') {
+      updateData.date = new Date(validatedData.date);
+    }
+    if (validatedData.dueDate && typeof validatedData.dueDate === 'string') {
+      updateData.dueDate = new Date(validatedData.dueDate);
+    }
+    if (validatedData.paymentDate && typeof validatedData.paymentDate === 'string') {
+      updateData.paymentDate = new Date(validatedData.paymentDate);
+    }
+
     // If currency or amount or exchangeRate changed, recalculate amountBDT
     if (
       (validatedData.currency && validatedData.currency !== 'BDT') ||
@@ -96,11 +107,13 @@ export async function PATCH(
     return NextResponse.json(transaction);
   } catch (error) {
     console.error('Error updating transaction:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
 
     if (error instanceof Error && 'issues' in error) {
       // Zod validation error
+      console.error('Zod validation error:', (error as any).issues);
       return NextResponse.json(
-        { error: 'Invalid transaction data', details: error },
+        { error: 'Invalid transaction data', details: (error as any).issues },
         { status: 400 }
       );
     }

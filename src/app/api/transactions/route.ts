@@ -135,6 +135,15 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const validatedData = createTransactionSchema.parse(body);
 
+    // Convert date strings to Date objects for Prisma
+    const date = typeof validatedData.date === 'string' ? new Date(validatedData.date) : validatedData.date;
+    const dueDate = validatedData.dueDate
+      ? (typeof validatedData.dueDate === 'string' ? new Date(validatedData.dueDate) : validatedData.dueDate)
+      : null;
+    const paymentDate = validatedData.paymentDate
+      ? (typeof validatedData.paymentDate === 'string' ? new Date(validatedData.paymentDate) : validatedData.paymentDate)
+      : null;
+
     // If exchange rate is provided but amountBDT isn't calculated, calculate it
     if (validatedData.currency !== 'BDT' && validatedData.exchangeRate && !validatedData.amountBDT) {
       validatedData.amountBDT = validatedData.amount * validatedData.exchangeRate;
@@ -149,8 +158,8 @@ export async function POST(request: NextRequest) {
     const transaction = await prisma.transaction.create({
       data: {
         type: validatedData.type,
-        date: validatedData.date,
-        dueDate: validatedData.dueDate || null,
+        date,
+        dueDate,
         category: validatedData.category,
         subcategory: validatedData.subcategory || null,
         payee: validatedData.payee,
@@ -160,7 +169,7 @@ export async function POST(request: NextRequest) {
         exchangeRate: validatedData.exchangeRate || null,
         amountBDT: validatedData.amountBDT,
         paymentStatus: validatedData.paymentStatus || 'UNPAID',
-        paymentDate: validatedData.paymentDate || null,
+        paymentDate,
         paymentMethod: validatedData.paymentMethod || null,
         invoiceNumber: validatedData.invoiceNumber || null,
         invoiceGenerated: validatedData.invoiceGenerated || false,
