@@ -52,10 +52,16 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Calculate next scheduled date
+    // For "10th of following month" payment terms, the transaction is dated
+    // one month after the work month (e.g., April work → May 10 transaction)
     const start = new Date(startDate);
     const nextScheduled = new Date(start);
+
+    // Transaction date is one month after the start date
+    nextScheduled.setMonth(nextScheduled.getMonth() + 1);
     nextScheduled.setDate(dayOfMonth);
 
+    // If that date is in the past, move to next occurrence
     if (nextScheduled < new Date()) {
       nextScheduled.setMonth(nextScheduled.getMonth() + 1);
     }

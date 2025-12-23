@@ -84,6 +84,16 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Create description that indicates which month's work this is for
+        let description = template.description;
+        if (template.paymentTerms?.toLowerCase().includes('10th of following month')) {
+          // Transaction date is payment date, work was done in previous month
+          const workMonth = new Date(transactionDate);
+          workMonth.setMonth(workMonth.getMonth() - 1);
+          const workMonthName = workMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+          description = `${template.description} - ${workMonthName}`;
+        }
+
         const transaction = await prisma.transaction.create({
           data: {
             type: template.type,
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
             exchangeRate,
             amountBDT,
             paymentStatus: 'UNPAID',
-            description: template.description,
+            description,
             recurringTemplateId: template.id,
           },
         });
