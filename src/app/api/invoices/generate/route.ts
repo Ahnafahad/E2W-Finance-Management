@@ -98,21 +98,42 @@ export async function POST(request: NextRequest) {
       console.log(`[${requestId}] Step 7 ✓: Currency is BDT, no conversion needed`);
     }
 
-    // Generate invoice number if not provided
-    console.log(`[${requestId}] Step 8: Processing invoice number...`);
-    console.log(`[${requestId}] Provided invoice number:`, invoiceData.metadata?.invoiceNumber);
+    // Auto-generate unique invoice number
+    console.log(`[${requestId}] Step 8: Generating unique invoice number...`);
 
-    let invoiceNumber = invoiceData.metadata?.invoiceNumber;
-    if (!invoiceNumber) {
-      const date = new Date();
-      const month = date.toLocaleString('default', { month: 'short' }).toUpperCase();
-      const year = date.getFullYear();
-      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      invoiceNumber = `INV-${month}-${year}-${randomNum}`;
-      console.log(`[${requestId}] Generated invoice number: ${invoiceNumber}`);
-    } else {
-      console.log(`[${requestId}] Using provided invoice number: ${invoiceNumber}`);
+    const date = new Date();
+    const month = date.toLocaleString('default', { month: 'short' }).toUpperCase();
+    const year = date.getFullYear();
+    const prefix = transactionType === 'INCOME' ? 'INV' : 'EXP';
+
+    // Find the highest invoice number with this prefix and date to ensure uniqueness
+    const existingInvoices = await prisma.transaction.findMany({
+      where: {
+        invoiceNumber: {
+          startsWith: `${prefix}-${month}-${year}-`
+        }
+      },
+      select: {
+        invoiceNumber: true
+      },
+      orderBy: {
+        invoiceNumber: 'desc'
+      },
+      take: 1
+    });
+
+    let sequenceNum = 1;
+    if (existingInvoices.length > 0 && existingInvoices[0].invoiceNumber) {
+      // Extract the sequence number from the last invoice
+      const lastInvoice = existingInvoices[0].invoiceNumber;
+      const match = lastInvoice.match(/-(\d{4})$/);
+      if (match) {
+        sequenceNum = parseInt(match[1], 10) + 1;
+      }
     }
+
+    const invoiceNumber = `${prefix}-${month}-${year}-${sequenceNum.toString().padStart(4, '0')}`;
+    console.log(`[${requestId}] Generated unique invoice number: ${invoiceNumber}`);
     console.log(`[${requestId}] Step 8 ✓: Invoice number = ${invoiceNumber}`);
 
 
