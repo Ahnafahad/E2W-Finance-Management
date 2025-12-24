@@ -739,7 +739,14 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
   let footerY = currentY - totalsBoxHeight - 40;
 
   // Render notes with word wrapping
-  if (notes && footerY > MIN_CONTENT_Y + 60) {
+  if (notes) {
+    // If not enough space for notes on current page, start a new page
+    if (footerY < MIN_CONTENT_Y + 60) {
+      addFooter(page, width, brandColor, regularFont, invoiceNumber);
+      page = addNewPage(pdfDoc, width, brandColor, regularFont, invoiceNumber);
+      footerY = height - 80;
+    }
+
     page.drawText('NOTES', {
       x: 50,
       y: footerY,
