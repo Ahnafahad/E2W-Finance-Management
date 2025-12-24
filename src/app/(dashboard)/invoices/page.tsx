@@ -225,7 +225,24 @@ export default function InvoicesPage() {
         body: JSON.stringify(invoiceData),
       });
 
-      if (!response.ok) throw new Error('Failed to generate invoice');
+      if (!response.ok) {
+        // Try to get detailed error from response
+        let errorMessage = 'Failed to generate invoice';
+        let requestId = '';
+        try {
+          const errorData = await response.json();
+          console.error('Server error response:', errorData);
+          errorMessage = errorData.details || errorData.error || errorMessage;
+          requestId = errorData.requestId || '';
+          if (requestId) {
+            console.error(`Request ID for debugging: ${requestId}`);
+            errorMessage = `${errorMessage} (Request ID: ${requestId})`;
+          }
+        } catch (e) {
+          console.error('Could not parse error response as JSON');
+        }
+        throw new Error(errorMessage);
+      }
 
       // Extract transaction info from headers
       const transactionId = response.headers.get('X-Transaction-Id');
@@ -276,7 +293,24 @@ export default function InvoicesPage() {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate invoice');
+      if (!response.ok) {
+        // Try to get detailed error from response
+        let errorMessage = 'Failed to generate invoice';
+        let requestId = '';
+        try {
+          const errorData = await response.json();
+          console.error('Server error response:', errorData);
+          errorMessage = errorData.details || errorData.error || errorMessage;
+          requestId = errorData.requestId || '';
+          if (requestId) {
+            console.error(`Request ID for debugging: ${requestId}`);
+            errorMessage = `${errorMessage} (Request ID: ${requestId})`;
+          }
+        } catch (e) {
+          console.error('Could not parse error response as JSON');
+        }
+        throw new Error(errorMessage);
+      }
 
       // Extract transaction info from headers
       const transactionId = response.headers.get('X-Transaction-Id');
