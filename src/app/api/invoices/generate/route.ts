@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateModernInvoicePDF } from '@/lib/pdf/modern-invoice-generator';
 import { prisma } from '@/lib/db';
+import { PaymentStatus, TransactionType } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
     // Create transaction record
     console.log(`[${requestId}] Step 9: Creating transaction in database...`);
     const transactionData = {
-      type: transactionType,
+      type: transactionType as TransactionType,
       date: new Date(),
       category: transactionType === 'INCOME' ? 'CLIENT INVOICE' : 'VENDOR INVOICE',
       payee: invoiceData.metadata.client,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       currency: currency,
       exchangeRate: exchangeRate,
       amountBDT: amountBDT,
-      paymentStatus: 'UNPAID',
+      paymentStatus: PaymentStatus.UNPAID,
       invoiceNumber: invoiceNumber,
       invoiceGenerated: true,
       notes: invoiceData.metadata?.notes || null,
