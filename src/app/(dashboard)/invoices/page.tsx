@@ -25,7 +25,6 @@ const SAMPLE_CLIENT_JSON = {
     chargedTo: 'Herman Tse',
     project: "Founder's Essentials Package",
     duration: '22 Oct – 23 Dec 2025',
-    invoiceNumber: 'INV-DEC-2025',
     notes: 'Payment due within 30 days.',
   },
   currency: 'GBP',
@@ -63,7 +62,6 @@ const SAMPLE_EXPENSE_JSON = {
     client: 'AWS',
     project: 'Cloud Infrastructure',
     duration: 'December 2025',
-    invoiceNumber: 'AWS-INV-123456',
     notes: 'Monthly cloud services bill.',
   },
   currency: 'USD',
@@ -112,7 +110,6 @@ export default function InvoicesPage() {
   const [chargedTo, setChargedTo] = useState('');
   const [project, setProject] = useState('');
   const [duration, setDuration] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [currency, setCurrency] = useState('GBP');
   const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState<LineItem[]>([
@@ -204,7 +201,6 @@ export default function InvoicesPage() {
           chargedTo: chargedTo || undefined,
           project: project || undefined,
           duration: duration || undefined,
-          invoiceNumber: invoiceNumber || undefined,
           notes: notes || undefined,
         },
         currency,
@@ -252,7 +248,7 @@ export default function InvoicesPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `invoice-${generatedInvoiceNumber || invoiceNumber || client.replace(/\s/g, '-')}.pdf`;
+      a.download = `invoice-${generatedInvoiceNumber || client.replace(/\s/g, '-')}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -321,7 +317,6 @@ export default function InvoicesPage() {
       const a = document.createElement('a');
       a.href = url;
       const fileName = generatedInvoiceNumber ||
-                      parsedData.metadata?.invoiceNumber ||
                       parsedData.metadata?.client?.replace(/\s/g, '-') ||
                       'invoice';
       a.download = `${fileName}.pdf`;
@@ -456,15 +451,10 @@ export default function InvoicesPage() {
                     className="mt-1"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                  <Input
-                    id="invoiceNumber"
-                    value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="e.g., INV-DEC-2025"
-                    className="mt-1"
-                  />
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Invoice Number:</strong> Auto-generated (e.g., INV-DEC-2025-0001 for income, EXP-DEC-2025-0001 for expenses)
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="currency">Currency</Label>
@@ -692,18 +682,18 @@ export default function InvoicesPage() {
                   <ul className="list-disc list-inside space-y-1 text-gray-700">
                     <li><code>type</code> - "INCOME" (client) or "EXPENSE" (vendor)</li>
                     <li><code>metadata.client</code> - Client/vendor name</li>
-                    <li><code>metadata.chargedTo</code> - Individual person/contact</li>
-                    <li><code>metadata.project</code> - Project name</li>
-                    <li><code>metadata.duration</code> - Duration string</li>
-                    <li><code>metadata.invoiceNumber</code> - Invoice number</li>
-                    <li><code>metadata.notes</code> - Additional notes</li>
+                    <li><code>metadata.chargedTo</code> - Individual person/contact (optional)</li>
+                    <li><code>metadata.project</code> - Project name (optional)</li>
+                    <li><code>metadata.duration</code> - Duration string (optional)</li>
+                    <li><code>metadata.notes</code> - Additional notes (optional)</li>
                     <li><code>currency</code> - Currency code (GBP, USD, EUR, BDT)</li>
-                    <li><code>lineItems[].description</code> - Item description</li>
-                    <li><code>lineItems[].details</code> - Array of detail strings</li>
-                    <li><code>totals.subtotal</code> - Subtotal amount</li>
-                    <li><code>totals.tax</code> - Tax amount</li>
-                    <li><code>totals.discount</code> - Discount amount</li>
+                    <li><code>lineItems[].description</code> - Item description (optional)</li>
+                    <li><code>lineItems[].details</code> - Array of detail strings (optional)</li>
+                    <li><code>totals.subtotal</code> - Subtotal amount (optional)</li>
+                    <li><code>totals.tax</code> - Tax amount (optional)</li>
+                    <li><code>totals.discount</code> - Discount amount (optional)</li>
                     <li><code>totals.total</code> - Total amount</li>
+                    <li className="text-green-600 font-medium">✓ Invoice numbers are auto-generated (INV-DEC-2025-0001, EXP-DEC-2025-0001, etc.)</li>
                   </ul>
                 </div>
 
