@@ -738,7 +738,7 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
 
   let footerY = currentY - totalsBoxHeight - 40;
 
-  // Check if notes fit on this page
+  // Render notes with word wrapping
   if (notes && footerY > MIN_CONTENT_Y + 60) {
     page.drawText('NOTES', {
       x: 50,
@@ -749,13 +749,55 @@ export async function generateModernInvoicePDF(data: ModernInvoiceData): Promise
     });
 
     footerY -= 18;
-    page.drawText(notes, {
-      x: 50,
-      y: footerY,
-      size: 9,
-      font: regularFont,
-      color: textSecondary,
-    });
+
+    // Word wrap notes to fit within page width
+    const maxNotesWidth = width - 100; // Leave margins on both sides
+    const words = notes.split(' ');
+    let line = '';
+
+    for (const word of words) {
+      const testLine = line + (line ? ' ' : '') + word;
+      const testWidth = regularFont.widthOfTextAtSize(testLine, 9);
+
+      if (testWidth > maxNotesWidth && line) {
+        // Check if we need a new page
+        if (footerY < MIN_CONTENT_Y + 20) {
+          addFooter(page, width, brandColor, regularFont, invoiceNumber);
+          page = addNewPage(pdfDoc, width, brandColor, regularFont, invoiceNumber);
+          footerY = height - 80;
+        }
+
+        page.drawText(line, {
+          x: 50,
+          y: footerY,
+          size: 9,
+          font: regularFont,
+          color: textSecondary,
+        });
+        footerY -= 14;
+        line = word;
+      } else {
+        line = testLine;
+      }
+    }
+
+    // Draw remaining line
+    if (line) {
+      // Check if we need a new page for last line
+      if (footerY < MIN_CONTENT_Y + 20) {
+        addFooter(page, width, brandColor, regularFont, invoiceNumber);
+        page = addNewPage(pdfDoc, width, brandColor, regularFont, invoiceNumber);
+        footerY = height - 80;
+      }
+
+      page.drawText(line, {
+        x: 50,
+        y: footerY,
+        size: 9,
+        font: regularFont,
+        color: textSecondary,
+      });
+    }
   }
 
   // Add footer to final page
