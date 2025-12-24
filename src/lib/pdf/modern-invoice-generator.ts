@@ -60,7 +60,7 @@ interface ModernInvoiceData {
 
 function getCurrencySymbol(currency: string): string {
   const symbols: { [key: string]: string } = {
-    'BDT': '৳',
+    'BDT': 'BDT',  // Use text instead of ৳ symbol (WinAnsi encoding doesn't support Bengali characters)
     'USD': '$',
     'GBP': '£',
     'EUR': '€',
