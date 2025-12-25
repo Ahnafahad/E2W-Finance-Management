@@ -14,7 +14,7 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
-  role         String   @default("admin")
+  role         UserRole @default(ADMIN)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -49,6 +49,9 @@ model Transaction {
   // Recurring transaction link
   recurringTemplateId String?
   recurringTemplate   RecurringTemplate? @relation(fields: [recurringTemplateId], references: [id])
+
+  // Payments (for partial payment tracking)
+  payments            Payment[]
 
   // Metadata
   createdAt           DateTime           @default(now())
@@ -147,6 +150,13 @@ model Invoice {
   createdAt       DateTime      @default(now())
 }
 
+enum UserRole {
+  ADMIN       // Full access to all features
+  MANAGER     // Can create, edit, delete transactions and view reports
+  ACCOUNTANT  // Can create and edit transactions, view reports (no delete)
+  VIEWER      // Read-only access to transactions and reports
+}
+
 enum TransactionType {
   EXPENSE
   INCOME
@@ -177,4 +187,39 @@ enum Frequency {
 enum InvoiceType {
   PAYABLE    // Invoice TO vendor (for expenses)
   RECEIVABLE // Invoice FROM client (for income)
+}
+
+model Payment {
+  id              String      @id @default(cuid())
+  transactionId   String
+  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  amount          Float       // Amount paid in original currency
+  currency        Currency    @default(BDT)
+  amountBDT       Float       // Amount paid in BDT
+  paymentDate     DateTime
+  paymentMethod   String?     // Cash, Bank Transfer, Credit Card, etc.
+  reference       String?     // Payment reference number
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([transactionId])
+  @@index([paymentDate])
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  entityType      String   // "Transaction", "RecurringTemplate", etc.
+  entityId        String   // ID of the entity being modified
+  action          String   // "CREATE", "UPDATE", "DELETE", "RESTORE"
+  userId          String?  // User who performed the action
+  userEmail       String?  // Email of the user
+  changes         String?  // JSON string of changes (old vs new values)
+  metadata        String?  // Additional context (IP, user agent, etc.)
+  createdAt       DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
 }

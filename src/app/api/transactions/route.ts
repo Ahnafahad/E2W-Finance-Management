@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { createTransactionSchema, transactionFilterSchema } from '@/lib/validations/transaction';
 import { Prisma } from '@prisma/client';
+import { convertCurrency, roundCurrency, validateExchangeRate } from '@/lib/utils/financial';
+import { createAuditLog, getUserInfoFromSession } from '@/lib/utils/audit';
+import { authorize, getUserRole, Permission } from '@/lib/utils/rbac';
 
 // GET /api/transactions - List transactions with filters
 export async function GET(request: NextRequest) {
@@ -12,6 +15,17 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Authorization check
+    try {
+      const userRole = getUserRole(session);
+      authorize(userRole, Permission.TRANSACTION_READ);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Forbidden' },
+        { status: 403 }
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -146,10 +160,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Authorization check
+    try {
+      const userRole = getUserRole(session);
+      authorize(userRole, Permission.TRANSACTION_CREATE);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     // Validate request body
     const validatedData = createTransactionSchema.parse(body);
+
+    // Validate exchange rate if provided
+    if (validatedData.exchangeRate && validatedData.currency !== 'BDT') {
+      const rateValidation = validateExchangeRate(
+        validatedData.currency,
+        'BDT',
+        validatedData.exchangeRate
+      );
+
+      if (!rateValidation.isValid) {
+        return NextResponse.json(
+          { error: rateValidation.error },
+          { status: 400 }
+        );
+      }
+
+      // Log warning if rate is outside typical range
+      if (rateValidation.warning) {
+        console.warn(`[Transaction Creation] ${rateValidation.warning}`);
+      }
+    }
 
     // Convert date strings to Date objects for Prisma
     const date = typeof validatedData.date === 'string' ? new Date(validatedData.date) : validatedData.date;
@@ -160,14 +206,14 @@ export async function POST(request: NextRequest) {
       ? (typeof validatedData.paymentDate === 'string' ? new Date(validatedData.paymentDate) : validatedData.paymentDate)
       : null;
 
-    // If exchange rate is provided but amountBDT isn't calculated, calculate it
+    // If exchange rate is provided but amountBDT isn't calculated, calculate it with proper rounding
     if (validatedData.currency !== 'BDT' && validatedData.exchangeRate && !validatedData.amountBDT) {
-      validatedData.amountBDT = validatedData.amount * validatedData.exchangeRate;
+      validatedData.amountBDT = convertCurrency(validatedData.amount, validatedData.exchangeRate);
     }
 
-    // If currency is BDT and amountBDT isn't set, set it to amount
+    // If currency is BDT and amountBDT isn't set, set it to amount (with rounding for consistency)
     if (validatedData.currency === 'BDT' && !validatedData.amountBDT) {
-      validatedData.amountBDT = validatedData.amount;
+      validatedData.amountBDT = roundCurrency(validatedData.amount);
     }
 
     // Create transaction
@@ -194,6 +240,21 @@ export async function POST(request: NextRequest) {
         tags: validatedData.tags || null,
         recurringTemplateId: validatedData.recurringTemplateId || null,
         createdBy: validatedData.createdBy || null,
+      },
+    });
+
+    // Audit log: Transaction created
+    const userInfo = getUserInfoFromSession(session);
+    await createAuditLog({
+      entityType: 'Transaction',
+      entityId: transaction.id,
+      action: 'CREATE',
+      ...userInfo,
+      metadata: {
+        invoiceNumber: transaction.invoiceNumber,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        payee: transaction.payee,
       },
     });
 

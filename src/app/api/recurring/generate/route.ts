@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { addMonths } from 'date-fns';
+import { convertCurrency, roundCurrency } from '@/lib/utils/financial';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,17 +71,15 @@ export async function POST(request: NextRequest) {
 
           if (rate) {
             exchangeRate = rate.rate;
-            amountBDT = template.amount * rate.rate;
+            amountBDT = convertCurrency(template.amount, rate.rate);
           } else {
-            // Default exchange rates if not found
-            const defaultRates: Record<string, number> = {
-              USD: 110,
-              GBP: 140,
-              EUR: 120,
-            };
-            const rateValue = defaultRates[template.currency] || 1;
-            exchangeRate = rateValue;
-            amountBDT = template.amount * rateValue;
+            // No exchange rate available - skip this template and log warning
+            console.warn(
+              `No exchange rate available for ${template.currency} to BDT. ` +
+              `Skipping recurring template: ${template.id} (${template.name}). ` +
+              `Please add an exchange rate for ${template.currency} to BDT.`
+            );
+            continue; // Skip this template
           }
         }
 

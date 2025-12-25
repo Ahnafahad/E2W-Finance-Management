@@ -28,7 +28,31 @@ export const transactionSchema = z.object({
   tags: z.string().optional().nullable(),
   recurringTemplateId: z.string().optional().nullable(),
   createdBy: z.string().optional().nullable(),
-});
+}).refine(
+  (data) => {
+    // If currency is not BDT, exchange rate is required
+    if (data.currency !== 'BDT' && !data.exchangeRate) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Exchange rate is required for non-BDT currencies',
+    path: ['exchangeRate'],
+  }
+).refine(
+  (data) => {
+    // If payment status is PAID, payment date is required
+    if (data.paymentStatus === 'PAID' && !data.paymentDate) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Payment date is required when marking transaction as PAID',
+    path: ['paymentDate'],
+  }
+);
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
 

@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { updateTransactionSchema } from '@/lib/validations/transaction';
 import { Prisma } from '@prisma/client';
+import { convertCurrency, roundCurrency, validateExchangeRate } from '@/lib/utils/financial';
+import { createAuditLog, getUserInfoFromSession, calculateChanges } from '@/lib/utils/audit';
+import { authorize, getUserRole, Permission } from '@/lib/utils/rbac';
 
 // GET /api/transactions/[id] - Get a single transaction
 export async function GET(
@@ -14,6 +17,17 @@ export async function GET(
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Authorization check
+    try {
+      const userRole = getUserRole(session);
+      authorize(userRole, Permission.TRANSACTION_READ);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Forbidden' },
+        { status: 403 }
+      );
     }
 
     const { id} = await params;
@@ -57,6 +71,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Authorization check
+    try {
+      const userRole = getUserRole(session);
+      authorize(userRole, Permission.TRANSACTION_UPDATE);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -81,6 +106,50 @@ export async function PATCH(
         { error: 'Cannot update a deleted transaction' },
         { status: 410 } // 410 Gone
       );
+    }
+
+    // Prevent changing financial amounts on PAID transactions
+    if (existingTransaction.paymentStatus === 'PAID') {
+      const financialFieldsBeingChanged = [
+        validatedData.amount !== undefined && validatedData.amount !== existingTransaction.amount,
+        validatedData.currency !== undefined && validatedData.currency !== existingTransaction.currency,
+        validatedData.exchangeRate !== undefined && validatedData.exchangeRate !== existingTransaction.exchangeRate,
+        validatedData.amountBDT !== undefined && validatedData.amountBDT !== existingTransaction.amountBDT,
+      ];
+
+      if (financialFieldsBeingChanged.some(changed => changed)) {
+        return NextResponse.json(
+          {
+            error: 'Cannot modify financial amounts (amount, currency, exchangeRate, amountBDT) on a PAID transaction',
+            hint: 'To modify amounts, first change the payment status to UNPAID or create a new transaction',
+          },
+          { status: 422 } // 422 Unprocessable Entity
+        );
+      }
+    }
+
+    // Validate exchange rate if being updated
+    if (validatedData.exchangeRate !== undefined) {
+      const currency = validatedData.currency || existingTransaction.currency;
+      if (currency && currency !== 'BDT') {
+        const rateValidation = validateExchangeRate(
+          currency,
+          'BDT',
+          validatedData.exchangeRate
+        );
+
+        if (!rateValidation.isValid) {
+          return NextResponse.json(
+            { error: rateValidation.error },
+            { status: 400 }
+          );
+        }
+
+        // Log warning if rate is outside typical range
+        if (rateValidation.warning) {
+          console.warn(`[Transaction Update] ${rateValidation.warning}`);
+        }
+      }
     }
 
     // Calculate amountBDT if needed
@@ -108,9 +177,9 @@ export async function PATCH(
       const exchangeRate = validatedData.exchangeRate ?? existingTransaction.exchangeRate;
 
       if (currency !== 'BDT' && exchangeRate) {
-        updateData.amountBDT = amount * exchangeRate;
+        updateData.amountBDT = convertCurrency(amount, exchangeRate);
       } else if (currency === 'BDT') {
-        updateData.amountBDT = amount;
+        updateData.amountBDT = roundCurrency(amount);
       }
     }
 
@@ -119,6 +188,27 @@ export async function PATCH(
       where: { id },
       data: updateData,
     });
+
+    // Audit log: Transaction updated
+    const userInfo = getUserInfoFromSession(session);
+    const changes = calculateChanges(
+      existingTransaction as Record<string, any>,
+      transaction as Record<string, any>
+    );
+
+    if (Object.keys(changes).length > 0) {
+      await createAuditLog({
+        entityType: 'Transaction',
+        entityId: transaction.id,
+        action: 'UPDATE',
+        ...userInfo,
+        changes,
+        metadata: {
+          invoiceNumber: transaction.invoiceNumber,
+          fieldsChanged: Object.keys(changes),
+        },
+      });
+    }
 
     return NextResponse.json(transaction);
   } catch (error) {
@@ -167,6 +257,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Authorization check
+    try {
+      const userRole = getUserRole(session);
+      authorize(userRole, Permission.TRANSACTION_DELETE);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Forbidden' },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     // Check if transaction exists and not already deleted
     const existingTransaction = await prisma.transaction.findUnique({
@@ -188,11 +289,26 @@ export async function DELETE(
     }
 
     // Soft delete transaction - set deletedAt timestamp and deletedBy
-    await prisma.transaction.update({
+    const deletedTransaction = await prisma.transaction.update({
       where: { id },
       data: {
         deletedAt: new Date(),
         deletedBy: session.user?.email || session.user?.name || 'unknown',
+      },
+    });
+
+    // Audit log: Transaction deleted
+    const userInfo = getUserInfoFromSession(session);
+    await createAuditLog({
+      entityType: 'Transaction',
+      entityId: id,
+      action: 'DELETE',
+      ...userInfo,
+      metadata: {
+        invoiceNumber: existingTransaction.invoiceNumber,
+        amount: existingTransaction.amount,
+        currency: existingTransaction.currency,
+        payee: existingTransaction.payee,
       },
     });
 

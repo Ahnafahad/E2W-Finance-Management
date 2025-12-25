@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateModernInvoicePDF } from '@/lib/pdf/modern-invoice-generator';
 import { prisma } from '@/lib/db';
 import { PaymentStatus, TransactionType } from '@prisma/client';
+import { convertCurrency, roundCurrency } from '@/lib/utils/financial';
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -79,21 +80,20 @@ export async function POST(request: NextRequest) {
       console.log(`[${requestId}] Database exchange rate found:`, !!rate);
       if (rate) {
         exchangeRate = rate.rate;
-        amountBDT = calculatedTotal * rate.rate;
+        amountBDT = convertCurrency(calculatedTotal, rate.rate);
         console.log(`[${requestId}] Using database rate: ${exchangeRate}`);
+        console.log(`[${requestId}] Step 7 ✓: Amount in BDT = ${amountBDT}`);
       } else {
-        // Default exchange rates if not found
-        const defaultRates: Record<string, number> = {
-          USD: 110,
-          GBP: 140,
-          EUR: 120,
-        };
-        const rateValue = defaultRates[currency] || 1;
-        exchangeRate = rateValue;
-        amountBDT = calculatedTotal * rateValue;
-        console.log(`[${requestId}] Using default rate: ${exchangeRate}`);
+        // No exchange rate available - return error
+        console.error(`[${requestId}] ✗ VALIDATION FAILED: No exchange rate available for ${currency} to BDT`);
+        return NextResponse.json(
+          {
+            error: `No exchange rate available for ${currency} to BDT. Please add an exchange rate first.`,
+            hint: 'You can add exchange rates via the Exchange Rates management page or API.'
+          },
+          { status: 400 }
+        );
       }
-      console.log(`[${requestId}] Step 7 ✓: Amount in BDT = ${amountBDT}`);
     } else {
       console.log(`[${requestId}] Step 7 ✓: Currency is BDT, no conversion needed`);
     }
