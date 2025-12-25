@@ -54,11 +54,14 @@ model Transaction {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   createdBy           String?
+  deletedAt           DateTime?          // Soft delete timestamp
+  deletedBy           String?            // Who deleted it
 
   @@index([date])
   @@index([type])
   @@index([paymentStatus])
   @@index([category])
+  @@index([deletedAt])                   // Index for filtering out deleted records
 }
 
 model RecurringTemplate {

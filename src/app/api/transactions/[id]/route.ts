@@ -16,7 +16,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id} = await params;
     const transaction = await prisma.transaction.findUnique({
       where: { id },
     });
@@ -25,6 +25,14 @@ export async function GET(
       return NextResponse.json(
         { error: 'Transaction not found' },
         { status: 404 }
+      );
+    }
+
+    // Check if transaction is soft-deleted
+    if (transaction.deletedAt) {
+      return NextResponse.json(
+        { error: 'Transaction has been deleted' },
+        { status: 410 } // 410 Gone
       );
     }
 
@@ -64,6 +72,14 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Transaction not found' },
         { status: 404 }
+      );
+    }
+
+    // Prevent updating deleted transactions
+    if (existingTransaction.deletedAt) {
+      return NextResponse.json(
+        { error: 'Cannot update a deleted transaction' },
+        { status: 410 } // 410 Gone
       );
     }
 
@@ -152,7 +168,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    // Check if transaction exists
+    // Check if transaction exists and not already deleted
     const existingTransaction = await prisma.transaction.findUnique({
       where: { id },
     });
@@ -164,9 +180,20 @@ export async function DELETE(
       );
     }
 
-    // Delete transaction
-    await prisma.transaction.delete({
+    if (existingTransaction.deletedAt) {
+      return NextResponse.json(
+        { error: 'Transaction already deleted' },
+        { status: 410 } // 410 Gone - resource deleted
+      );
+    }
+
+    // Soft delete transaction - set deletedAt timestamp and deletedBy
+    await prisma.transaction.update({
       where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: session.user?.email || session.user?.name || 'unknown',
+      },
     });
 
     return NextResponse.json(

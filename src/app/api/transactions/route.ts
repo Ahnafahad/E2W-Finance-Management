@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
     const filters = transactionFilterSchema.parse(filterParams);
 
     // Build where clause
-    const where: Prisma.TransactionWhereInput = {};
+    const where: Prisma.TransactionWhereInput = {
+      deletedAt: null, // Exclude soft-deleted transactions
+    };
 
     if (filters.type && filters.type !== 'ALL') {
       where.type = filters.type;
