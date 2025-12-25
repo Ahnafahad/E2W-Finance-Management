@@ -129,7 +129,7 @@ export async function PATCH(
     }
 
     // Validate exchange rate if being updated
-    if (validatedData.exchangeRate !== undefined) {
+    if (validatedData.exchangeRate !== undefined && validatedData.exchangeRate !== null) {
       const currency = validatedData.currency || existingTransaction.currency;
       if (currency && currency !== 'BDT') {
         const rateValidation = validateExchangeRate(
