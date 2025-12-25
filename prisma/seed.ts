@@ -97,7 +97,7 @@ async function seedAdminUser() {
     create: {
       email,
       passwordHash,
-      role: 'admin',
+      role: 'ADMIN',
     },
   });
 
