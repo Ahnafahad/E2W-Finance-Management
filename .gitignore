@@ -47,3 +47,6 @@ prisma/*.db-journal
 
 .vercel
 .env*.local
+
+# Vercel environment file
+.env.vercel
