@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { createTransactionSchema, transactionFilterSchema } from '@/lib/validations/transaction';
 import { Prisma } from '@prisma/client';
@@ -6,6 +8,12 @@ import { Prisma } from '@prisma/client';
 // GET /api/transactions - List transactions with filters
 export async function GET(request: NextRequest) {
   try {
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parse and validate query parameters
@@ -130,6 +138,12 @@ export async function GET(request: NextRequest) {
 // POST /api/transactions - Create a new transaction
 export async function POST(request: NextRequest) {
   try {
+    // Authentication check
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     // Validate request body
