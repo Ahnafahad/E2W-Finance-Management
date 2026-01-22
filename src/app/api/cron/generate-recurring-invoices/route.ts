@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { addMonths } from 'date-fns';
+import { convertCurrency } from '@/lib/utils/financial';
 
 /**
  * Vercel Cron Job endpoint for automatic recurring invoice generation
@@ -52,9 +53,6 @@ export async function GET(request: NextRequest) {
           },
         ],
       },
-      include: {
-        user: true,
-      },
     });
 
     console.log(`[Cron] Found ${templates.length} templates ready for generation`);
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
     // Generate transactions for each template
     for (const template of templates) {
       try {
-        const transactionDate = new Date();
+        const transactionDate = template.nextScheduled || now;
 
         // Calculate due date based on payment terms
         let dueDate: Date;
@@ -85,28 +83,58 @@ export async function GET(request: NextRequest) {
           );
         }
 
+        // Get exchange rate for non-BDT currencies
+        let amountBDT = template.amount;
+        let exchangeRate: number | null = null;
+
+        if (template.currency !== 'BDT') {
+          const rate = await prisma.exchangeRate.findFirst({
+            where: {
+              fromCurrency: template.currency,
+              toCurrency: 'BDT',
+            },
+            orderBy: {
+              date: 'desc',
+            },
+          });
+
+          if (rate) {
+            exchangeRate = rate.rate;
+            amountBDT = convertCurrency(template.amount, rate.rate);
+          } else {
+            console.warn(
+              `[Cron] No exchange rate for ${template.currency} to BDT. Skipping template: ${template.id}`
+            );
+            results.failed++;
+            results.errors.push(`Template ${template.id}: No exchange rate for ${template.currency}`);
+            continue;
+          }
+        }
+
+        // Create description
+        let description = template.description;
+        if (template.paymentTerms?.toLowerCase().includes('10th of following month')) {
+          const workMonth = new Date(transactionDate);
+          workMonth.setMonth(workMonth.getMonth() - 1);
+          const workMonthName = workMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+          description = `${template.description} - ${workMonthName}`;
+        }
+
         // Create transaction from template
         const transaction = await prisma.transaction.create({
           data: {
+            type: template.type,
             date: transactionDate,
+            dueDate: dueDate,
+            category: template.category,
+            subcategory: template.subcategory,
+            payee: template.payee,
             amount: template.amount,
             currency: template.currency,
-            type: template.type,
-            category: template.category,
-            subcategory: template.subcategory || '',
-            description: template.description,
-            paymentMethod: template.paymentMethod || 'BANK_TRANSFER',
-            clientName: template.clientName,
-            email: template.email,
-            phone: template.phone,
-            address: template.address,
-            invoiceGenerated: true,
-            projectName: template.projectName,
-            duration: template.duration,
-            notes: template.notes,
-            lineItemsJson: template.lineItemsJson,
-            paymentTerms: template.paymentTerms,
-            userId: template.userId,
+            exchangeRate,
+            amountBDT,
+            paymentStatus: 'UNPAID',
+            description: description || `${template.name} - Auto-generated`,
             recurringTemplateId: template.id,
           },
         });
