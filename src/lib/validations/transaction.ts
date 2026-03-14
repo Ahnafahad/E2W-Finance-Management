@@ -28,6 +28,9 @@ export const transactionSchema = z.object({
   tags: z.string().optional().nullable(),
   recurringTemplateId: z.string().optional().nullable(),
   createdBy: z.string().optional().nullable(),
+  lineItemsJson: z.string().optional().nullable(),
+  projectName: z.string().optional().nullable(),
+  duration: z.string().optional().nullable(),
 }).refine(
   (data) => {
     // If currency is not BDT, exchange rate is required

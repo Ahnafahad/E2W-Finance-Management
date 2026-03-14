@@ -9,6 +9,7 @@ import {
   calculateCashFlowSummary,
   calculatePaymentStatusSummary,
   calculateProfitMargin,
+  calculatePeriodProfitLoss,
   type TransactionForReport,
 } from '@/lib/utils/reports';
 import type { GroupBy } from '@/lib/utils/date';
@@ -124,17 +125,37 @@ export async function GET(request: NextRequest) {
     const agingBuckets = calculateAgingBuckets(unpaidForReport);
     const paymentStatusSummary = calculatePaymentStatusSummary(agingBuckets);
 
-    // === PROFIT & LOSS STATEMENT ===
-    const incomeTransactions = transactionsForReport.filter((t) => t.type === 'INCOME');
+    // === PROFIT & LOSS STATEMENT (Cash Basis) ===
+    // Revenue: only recognized when PAID (cash-basis accounting)
+    // Expenses: recognized when recorded
+    const paidIncomeTransactions = transactionsForReport.filter(
+      (t) => t.type === 'INCOME' && t.paymentStatus === 'PAID'
+    );
     const expenseTransactions = transactionsForReport.filter((t) => t.type === 'EXPENSE');
 
-    const revenueByCategory = calculateCategoryBreakdown(incomeTransactions);
+    // Unrecognized revenue: income recorded but not yet paid
+    const unrecognizedIncomeTransactions = transactionsForReport.filter(
+      (t) => t.type === 'INCOME' && t.paymentStatus !== 'PAID'
+    );
+
+    const revenueByCategory = calculateCategoryBreakdown(paidIncomeTransactions);
     const expensesByCategory = calculateCategoryBreakdown(expenseTransactions);
 
     const totalRevenue = revenueByCategory.reduce((sum, cat) => sum + cat.amount, 0);
     const totalExpenses = expensesByCategory.reduce((sum, cat) => sum + cat.amount, 0);
     const netIncome = totalRevenue - totalExpenses;
     const profitMargin = calculateProfitMargin(totalRevenue, totalExpenses);
+
+    const unrecognizedRevenue = unrecognizedIncomeTransactions.reduce(
+      (sum, t) => sum + t.amountBDT, 0
+    );
+
+    // Period breakdown for trend view
+    const periodBreakdown = calculatePeriodProfitLoss(
+      paidIncomeTransactions,
+      expenseTransactions,
+      groupBy
+    );
 
     // Construct response
     const reportData = {
@@ -157,6 +178,8 @@ export async function GET(request: NextRequest) {
         },
         netIncome,
         profitMargin,
+        unrecognizedRevenue,
+        periodBreakdown,
       },
     };
 

@@ -1,163 +1,141 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DateRangeSelector } from '@/components/reports/DateRangeSelector';
-import { CashFlowChart } from '@/components/reports/CashFlowChart';
-import { PaymentStatusReport } from '@/components/reports/PaymentStatusReport';
 import { ProfitLossStatement } from '@/components/reports/ProfitLossStatement';
-import { getDefaultDateRange } from '@/lib/utils/date';
+import { endOfMonth, startOfMonth, subMonths, startOfQuarter, endOfQuarter, subQuarters } from 'date-fns';
+import type { PeriodProfitLoss } from '@/lib/utils/reports';
 
-interface ReportData {
-  cashFlow: {
-    trends: Array<{
-      period: string;
-      label: string;
-      income: number;
-      expenses: number;
-      netCashFlow: number;
-      counts: {
-        income: number;
-        expense: number;
-      };
-    }>;
-    summary: {
-      totalIncome: number;
-      totalExpenses: number;
-      netCashFlow: number;
-      averageMonthlyIncome: number;
-      averageMonthlyExpenses: number;
-    };
+export type PeriodMode = 'monthly' | 'quarterly' | 'half-yearly' | 'lifetime';
+
+interface ProfitLossData {
+  revenue: {
+    total: number;
+    byCategory: Array<{ category: string; amount: number; percentage: number }>;
   };
-  paymentStatus: {
-    aging: Array<{
-      range: string;
-      minDays: number;
-      maxDays: number | null;
-      count: number;
-      total: number;
-      transactions: Array<any>;
-    }>;
-    summary: {
-      totalUnpaid: number;
-      totalOverdue: number;
-      unpaidCount: number;
-      overdueCount: number;
-      averageDaysOutstanding: number;
-    };
+  expenses: {
+    total: number;
+    byCategory: Array<{ category: string; amount: number; percentage: number }>;
   };
-  profitLoss: {
-    revenue: {
-      total: number;
-      byCategory: Array<{
-        category: string;
-        amount: number;
-        percentage: number;
-      }>;
-    };
-    expenses: {
-      total: number;
-      byCategory: Array<{
-        category: string;
-        amount: number;
-        percentage: number;
-      }>;
-    };
-    netIncome: number;
-    profitMargin: number;
-  };
+  netIncome: number;
+  profitMargin: number;
+  unrecognizedRevenue: number;
+  periodBreakdown: PeriodProfitLoss[];
 }
 
+function getModeParams(mode: PeriodMode): { startDate: Date; endDate: Date; groupBy: string } {
+  const now = new Date();
+
+  switch (mode) {
+    case 'monthly':
+      return {
+        startDate: startOfMonth(subMonths(now, 11)),
+        endDate: endOfMonth(now),
+        groupBy: 'month',
+      };
+    case 'quarterly':
+      return {
+        startDate: startOfQuarter(subQuarters(now, 3)),
+        endDate: endOfQuarter(now),
+        groupBy: 'quarter',
+      };
+    case 'half-yearly': {
+      const isH2 = now.getMonth() >= 6;
+      return {
+        startDate: isH2
+          ? new Date(now.getFullYear() - 1, 6, 1)  // Start of last H2 (18 months back)
+          : new Date(now.getFullYear() - 2, 0, 1),  // Start of H1 two years ago
+        endDate: endOfMonth(now),
+        groupBy: 'half-year',
+      };
+    }
+    case 'lifetime':
+      return {
+        startDate: new Date('2020-01-01'),
+        endDate: endOfMonth(now),
+        groupBy: 'year',
+      };
+  }
+}
+
+const PERIOD_TABS: Array<{ value: PeriodMode; label: string; description: string }> = [
+  { value: 'monthly', label: 'Monthly', description: 'Last 12 months' },
+  { value: 'quarterly', label: 'Quarterly', description: 'Last 4 quarters' },
+  { value: 'half-yearly', label: 'Half-Yearly', description: 'By half-year' },
+  { value: 'lifetime', label: 'Lifetime', description: 'All time by year' },
+];
+
 export default function ReportsPage() {
-  const [dateRange, setDateRange] = useState(getDefaultDateRange());
-  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [mode, setMode] = useState<PeriodMode>('monthly');
+  const [reportData, setReportData] = useState<ProfitLossData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReports();
-  }, [dateRange]);
+    fetchReport();
+  }, [mode]);
 
-  const fetchReports = async () => {
+  const fetchReport = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const { startDate, endDate, groupBy } = getModeParams(mode);
+
       const params = new URLSearchParams({
-        startDate: dateRange.start.toISOString(),
-        endDate: dateRange.end.toISOString(),
-        groupBy: 'month',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        groupBy,
       });
 
       const response = await fetch(`/api/reports?${params}`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch reports');
-      }
+      if (!response.ok) throw new Error('Failed to fetch report');
 
       const data = await response.json();
-      setReportData(data);
+      setReportData(data.profitLoss);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Reports fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRangeChange = (start: Date, end: Date) => {
-    setDateRange({ start, end });
-  };
-
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Financial Reports</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Comprehensive financial analysis and insights
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Profit & Loss</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Cash basis — revenue recognized when paid, expenses recognized when recorded
         </p>
       </div>
 
-      {/* Date Range Selector */}
-      <DateRangeSelector onRangeChange={handleRangeChange} initialRange={dateRange} />
+      {/* Period Mode Tabs */}
+      <div className="flex gap-2 mb-8 border-b border-gray-200">
+        {PERIOD_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setMode(tab.value)}
+            className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+              mode === tab.value
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <span className="block">{tab.label}</span>
+            <span className="block text-xs font-normal opacity-70">{tab.description}</span>
+          </button>
+        ))}
+      </div>
 
-      {/* Error State */}
+      {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
           {error}
         </div>
       )}
 
-      {/* Loading State */}
-      {loading && !reportData && (
-        <div className="flex h-96 items-center justify-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      )}
-
-      {/* Report Tabs */}
-      {reportData && (
-        <Tabs defaultValue="cashflow" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>
-            <TabsTrigger value="payment-status">Payment Status</TabsTrigger>
-            <TabsTrigger value="profit-loss">Profit & Loss</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="cashflow">
-            <CashFlowChart data={reportData.cashFlow} loading={loading} />
-          </TabsContent>
-
-          <TabsContent value="payment-status">
-            <PaymentStatusReport data={reportData.paymentStatus} loading={loading} />
-          </TabsContent>
-
-          <TabsContent value="profit-loss">
-            <ProfitLossStatement data={reportData.profitLoss} loading={loading} />
-          </TabsContent>
-        </Tabs>
-      )}
+      {/* P&L Report */}
+      <ProfitLossStatement data={reportData} loading={loading} mode={mode} />
     </div>
   );
 }

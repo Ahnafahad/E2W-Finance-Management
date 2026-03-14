@@ -316,3 +316,58 @@ export function calculateProfitMargin(revenue: number, expenses: number): number
   const margin = (netIncome / revenue) * 100;
   return roundCurrency(margin);
 }
+
+/**
+ * Period P&L data point (cash basis)
+ */
+export interface PeriodProfitLoss {
+  period: string;
+  label: string;
+  revenue: number;
+  expenses: number;
+  netIncome: number;
+  profitMargin: number;
+}
+
+/**
+ * Calculate period-by-period P&L breakdown (cash basis)
+ * paidIncome: INCOME transactions with paymentStatus=PAID
+ * expenses: all EXPENSE transactions
+ */
+export function calculatePeriodProfitLoss(
+  paidIncome: TransactionForReport[],
+  expenses: TransactionForReport[],
+  groupBy: GroupBy = 'month'
+): PeriodProfitLoss[] {
+  // Collect all periods from both income and expense transactions
+  const allTransactions = [...paidIncome, ...expenses];
+  const periodSet = new Set<string>();
+
+  allTransactions.forEach((t) => {
+    periodSet.add(getPeriodIdentifier(t.date, groupBy));
+  });
+
+  const periods = Array.from(periodSet).sort();
+
+  return periods.map((period) => {
+    const periodIncome = paidIncome.filter(
+      (t) => getPeriodIdentifier(t.date, groupBy) === period
+    );
+    const periodExpenses = expenses.filter(
+      (t) => getPeriodIdentifier(t.date, groupBy) === period
+    );
+
+    const revenue = roundCurrency(periodIncome.reduce((sum, t) => sum + t.amountBDT, 0));
+    const totalExpenses = roundCurrency(periodExpenses.reduce((sum, t) => sum + t.amountBDT, 0));
+    const netIncome = roundCurrency(revenue - totalExpenses);
+    const profitMargin = revenue > 0 ? roundCurrency((netIncome / revenue) * 100) : 0;
+
+    // Get label from first transaction in this period, or derive from period string
+    const firstTx = periodIncome[0] || periodExpenses[0];
+    const label = firstTx
+      ? formatPeriodLabel(firstTx.date, groupBy)
+      : period;
+
+    return { period, label, revenue, expenses: totalExpenses, netIncome, profitMargin };
+  });
+}

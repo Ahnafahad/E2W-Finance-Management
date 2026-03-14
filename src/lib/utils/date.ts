@@ -16,11 +16,14 @@ export type DateRangePreset =
   | 'last-month'
   | 'this-quarter'
   | 'last-quarter'
+  | 'this-half-year'
+  | 'last-half-year'
   | 'this-year'
   | 'last-year'
+  | 'lifetime'
   | 'custom';
 
-export type GroupBy = 'month' | 'quarter' | 'year';
+export type GroupBy = 'month' | 'quarter' | 'half-year' | 'year';
 
 export interface DateRange {
   start: Date;
@@ -94,6 +97,36 @@ export function getDateRange(preset: DateRangePreset): DateRange | null {
       };
     }
 
+    case 'this-half-year': {
+      const isH2 = now.getMonth() >= 6;
+      return {
+        start: new Date(now.getFullYear(), isH2 ? 6 : 0, 1),
+        end: endOfMonth(now),
+      };
+    }
+
+    case 'last-half-year': {
+      const isH2 = now.getMonth() >= 6;
+      // If currently H2, last half-year is H1 of this year; if H1, it's H2 of last year
+      if (isH2) {
+        return {
+          start: new Date(now.getFullYear(), 0, 1),
+          end: new Date(now.getFullYear(), 5, 30, 23, 59, 59),
+        };
+      } else {
+        return {
+          start: new Date(now.getFullYear() - 1, 6, 1),
+          end: new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59),
+        };
+      }
+    }
+
+    case 'lifetime':
+      return {
+        start: new Date('2020-01-01'),
+        end: endOfMonth(now),
+      };
+
     case 'custom':
       // Return null for custom - caller should provide dates
       return null;
@@ -116,6 +149,11 @@ export function formatPeriodLabel(date: Date, groupBy: GroupBy): string {
       return `Q${quarter} ${format(date, 'yyyy')}`; // "Q1 2025"
     }
 
+    case 'half-year': {
+      const half = date.getMonth() < 6 ? 1 : 2;
+      return `H${half} ${format(date, 'yyyy')}`; // "H1 2025"
+    }
+
     case 'year':
       return format(date, 'yyyy'); // "2025"
 
@@ -135,6 +173,11 @@ export function getPeriodIdentifier(date: Date, groupBy: GroupBy): string {
     case 'quarter': {
       const quarter = Math.floor(date.getMonth() / 3) + 1;
       return `${format(date, 'yyyy')}-Q${quarter}`; // "2025-Q1"
+    }
+
+    case 'half-year': {
+      const half = date.getMonth() < 6 ? 1 : 2;
+      return `${format(date, 'yyyy')}-H${half}`; // "2025-H1"
     }
 
     case 'year':
